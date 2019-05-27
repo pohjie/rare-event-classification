@@ -4,4 +4,4 @@ Bulk of code obtained from https://towardsdatascience.com/extreme-rare-event-cla
 Minor modifications from myself may be included
 
 ## Purpose
-This tutorial is followed as the goal is to predict when to long/short certain stocks, whereby their labelled data of 'trade' is a lot more rare than 'not trade'
+This tutorial is followed as the goal is to predict when to long/short certain stocks, whereby their labelled data of 'trade' is a lot more rare than 'not trade'.
