@@ -103,7 +103,7 @@ df_test_0_x_rescaled = scaler.transform(df_test_0_x)
 df_test_x_rescaled = scaler.transform(df_test.drop(['y'], axis=1))
 
 # Initialise Autoencoder architecture
-num_epoch = 1000
+num_epoch = 100
 batch_size = 128
 input_dim = df_train_0_x_rescaled.shape[1] # num of predictor variables
 encoding_dim = 32
@@ -176,4 +176,18 @@ sns.heatmap(conf_matrix, xticklabels=LABELS, yticklabels=LABELS, annot=True, fmt
 plt.title('Confusion matrix')
 plt.ylabel('True class')
 plt.xlabel('Predicted class')
+plt.show()
+
+false_pos_rate, true_pos_rate, thresholds = roc_curve(error_df.True_class, error_df.Reconstruction_error)
+roc_auc = auc(false_pos_rate, true_pos_rate)
+
+plt.plot(false_pos_rate, true_pos_rate, linewidth=5, label='AUC = %0.3f' % roc_auc)
+plt.plot([0, 1], [0,1], linewidth=5)
+
+plt.xlim([-0.01, 1])
+plt.ylim([0, 1.01])
+plt.legend(loc='lower right')
+plt.title('Receiver operating characteristic curve (ROC)')
+plt.ylabel('True positive rate')
+plt.xlabel('False positive rate')
 plt.show()
