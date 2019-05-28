@@ -87,12 +87,13 @@ print('After shifting') # Validating if the shift is right
 print(df.iloc[(one_indexes[0]-4):(one_indexes[0]+1), 0:5].head(n=5))
 
 # Extract features and responses
+df = df.drop(columns=['time'])
 input_X = df.loc[:, df.columns != 'y'].values # converts df to a numpy array
 input_y = df['y'].values
 
 n_features = input_X.shape[1]
 
-def temporalize(X, y, lookback):
+def temporalize(input_X, input_y, lookback):
     X = []
     y = []
 
@@ -100,9 +101,88 @@ def temporalize(X, y, lookback):
         t = []
         for j in range(1, lookback+1):
             # Gather past records up to the lookback period
-            t.append(inpuy_X[[(i+j+1)], :])
+            t.append(input_X[[(i+j+1)], :])
 
         X.append(t)
         y.append(input_y[i+lookback+1])
 
     return X, y
+
+print('First instance of y=1 in the original data')
+print(df.iloc[(np.where(np.array(input_y) == 1)[0][0] - 5):(np.where(np.array(input_y) == 1)[0][0]+1), ])
+
+lookback = 5 # equivalent to 10 min of past data
+# Temporalize the data
+X, y = temporalize(input_X, input_y, lookback)
+
+print('For the same instance of y = 1, we are keeping past 5 samples in the 3D predictor array, X.')
+print(pd.DataFrame(np.concatenate(X[np.where(np.array(y) == 1) [0][0]], axis=0)))
+
+# Spilt into train, test valid set
+X_train, X_test, y_train, y_test = train_test_split(np.array(X), np.array(y), test_size=DATA_SPLIT_PCT, random_state=SEED)
+X_train, X_valid, y_train, y_valid = train_test_split(X_train, y_train, test_size=DATA_SPLIT_PCT, random_state=SEED)
+
+X_train_y0 = X_train[y_train==0]
+X_train_y1 = X_train[y_train==1]
+
+X_valid_y0 = X_valid[y_valid==0]
+X_valid_y1 = X_valid[y_valid==1]
+
+# Reshape X into required 3D dimensions
+X_train = X_train.reshape(X_train.shape[0], lookback, n_features)
+X_train_y0 = X_train_y0.reshape(X_train_y0.shape[0], lookback, n_features)
+X_train_y1 = X_train_y1.reshape(X_train_y1.shape[0], lookback, n_features)
+
+X_valid = X_valid.reshape(X_valid.shape[0], lookback, n_features)
+X_valid_y0 = X_valid_y0.reshape(X_valid_y0.shape[0], lookback, n_features)
+X_valid_y1 = X_valid_y1.reshape(X_valid_y1.shape[0], lookback, n_features)
+
+X_test = X_test.reshape(X_test.shape[0], lookback, n_features)
+
+# Flatten function- inverse of temporalise
+def flatten(X):
+    '''
+    Flatten a 3D array
+    Input
+    X: A 3D array for LSTM, where the dimensions are num_samples * timesteps * n_features
+    Output
+    flattened_X: A 2D array, where the dimensions are num_samples * n_features
+    '''
+    flattened_X = np.empty((X.shape[0], X.shape[2])) # n_samples * n_features array
+    for i in range(X.shape[0]):
+        flattened_X[i] = X[i, (X.shape[1] - 1), :]
+    return flattened_X
+
+def scale(X, scaler): 
+    '''
+    Scale 3D array.
+
+    Inputs
+    X: A 3D array for LSTM, where the array is num_samples, * timesteps * features
+    scaler: A scaler object
+    Output
+    scaled_X: Scaled 3D array
+    '''
+    for i in range(X.shape[0]):
+        X[i, :, :] = scaler.transform(X[i, :, :])
+
+    return X
+
+# Initialize a scaler using the training data.
+scaler = StandardScaler().fit(flatten(X_train_y0))
+
+X_train_y0_scaled = scale(X_train_y0, scaler)
+
+# scale validation and test set
+X_valid_scaled = scale(X_valid, scaler)
+X_valid_y0_scaled = scale(X_valid_y0, scaler)
+
+X_test_scaled = scale(X_test, scaler)
+
+# LSTM Autoencoder Training
+timesteps = X_train_y0_scaled.shape[1]
+n_features = X_train_y0_scaled.shape[2]
+
+num_epochs = 500
+batch_size = 64
+lr = 0.0001
